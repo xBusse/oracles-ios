@@ -23,6 +23,9 @@ int gui_mods(const ModInfo *official, const bool *enabled, int selected, bool pl
             tapped = GUI_MOD_SETTING + i;
         }
         paragraph(CLAY_STRING("Takes effect right away."), SMALL, t->soft, 8, 0);
+      } else if (!playing && installed_count > 0) {
+        section(t, "Mod settings");
+        paragraph(CLAY_STRING("Start a game, then open Mods from the pause menu to change mod settings such as cheats."), SMALL, t->soft, 12, 12);
       }
       section(t, "Official mods");
       for (int i = 0; i < 2; i++) {
