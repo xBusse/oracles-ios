@@ -515,10 +515,19 @@ static bool copy_tree(const char *from, const char *to) {
 // Only when missing: deleting one there and keeping it gone is not possible, but a toggled-off mod
 // does nothing, and an edited copy is never overwritten.
 static SDL_EnumerationResult SDLCALL install_bundled_mod(void *cache, const char *dir, const char *name) {
-  char src[1100], dst[1100];
-  snprintf(src, sizeof src, "%s%s", dir, name);
-  snprintf(dst, sizeof dst, "%smods/%s", (const char *)cache, name);
-  if (!file_exists(dst)) copy_tree(src, dst);
+  char src[1100], dst[1100], ini[1120], stray[1120];
+  // copy_tree wants both folders with their trailing slash
+  snprintf(src, sizeof src, "%s%s/", dir, name);
+  snprintf(dst, sizeof dst, "%smods/%s/", (const char *)cache, name);
+  // 1.0's install left an empty folder and the files beside it (mods/cheatsmain.lua): tidy those
+  static const char *const files[] = {"mod.ini", "main.lua"};
+  for (size_t i = 0; i < sizeof files / sizeof *files; i++) {
+    snprintf(stray, sizeof stray, "%smods/%s%s", (const char *)cache, name, files[i]);
+    SDL_RemovePath(stray);
+  }
+  // installed means its mod.ini is there, not just its folder
+  snprintf(ini, sizeof ini, "%smod.ini", dst);
+  if (!file_exists(ini) && !copy_tree(src, dst)) fprintf(stderr, "could not install mod %s: %s\n", name, SDL_GetError());
   return SDL_ENUM_CONTINUE;
 }
 static void install_bundled_mods(const char *cache) {

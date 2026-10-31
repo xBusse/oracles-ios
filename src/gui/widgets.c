@@ -216,10 +216,29 @@ Clay_ElementDeclaration list_box(Clay_ElementId id) {
       .clip = {.vertical = true, .childOffset = Clay_GetScrollOffset()}};
 }
 
+// Scrolls only when the selection has moved (or the list has just appeared), not every frame:
+// called every frame, it pulled a touch drag back whenever the drag took the selected row out of
+// view, so a list could only be dragged as far as its selected row allowed.
+#define KEEP_LISTS 8
+static struct { uint32_t list, item; uint64_t seen; } kept[KEEP_LISTS];
+
 void keep_visible(Clay_ElementId list, Clay_ElementId item) {
+  uint64_t now = SDL_GetTicks();
+  int slot = -1, oldest = 0;
+  for (int i = 0; i < KEEP_LISTS; i++) {
+    if (kept[i].list == list.id) { slot = i; break; }
+    if (kept[i].seen < kept[oldest].seen) oldest = i;
+  }
+  bool fresh = slot < 0 || now - kept[slot].seen > 250;   // not drawn a moment ago: a new visit
+  if (slot < 0) slot = oldest;
+  bool moved = fresh || kept[slot].item != item.id;
+  kept[slot].list = list.id;
+  kept[slot].seen = now;
+  if (!moved) return;
   Clay_ScrollContainerData sc = Clay_GetScrollContainerData(list);
   Clay_ElementData box = Clay_GetElementData(list), it = Clay_GetElementData(item);
-  if (!sc.found || !box.found || !it.found) return;
+  if (!sc.found || !box.found || !it.found) return;   // laid out next frame: try again then
+  kept[slot].item = item.id;
   float top = box.boundingBox.y, bottom = top + box.boundingBox.height;
   if (it.boundingBox.y < top) sc.scrollPosition->y += top - it.boundingBox.y;
   else if (it.boundingBox.y + it.boundingBox.height > bottom) sc.scrollPosition->y -= it.boundingBox.y + it.boundingBox.height - bottom;
