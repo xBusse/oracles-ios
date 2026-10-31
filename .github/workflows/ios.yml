@@ -10,6 +10,9 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write   # to replace the ios-latest release
+
 jobs:
   ipa:
     runs-on: macos-15
@@ -23,3 +26,11 @@ jobs:
           name: Oracles-ipa
           path: Oracles.ipa
           retention-days: 14
+      # A fixed release whose Oracles.ipa is always the newest build: one link to tap on the phone.
+      - name: Publish ios-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-latest --yes --cleanup-tag || true
+          gh release create ios-latest Oracles.ipa --prerelease --target "$GITHUB_SHA" \
+            --title "iOS build ${GITHUB_SHA::7}" --notes "Unsigned; open in SideStore or AltStore."
