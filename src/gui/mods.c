@@ -7,6 +7,23 @@ int gui_mods(const ModInfo *official, const bool *enabled, int selected, bool pl
   PAGE(t, f) {
     if (header(t, "Mods", f->hints ? hint_of(f, "change", "back") : NULL)) tapped = GUI_BACK;
     LIST("ModsList") {
+      // The rows loaded mods registered with oracles.setting, grouped by mod. They exist only once a
+      // game has loaded its mods, so the section shows while playing. Selection index 2 + i.
+      if (playing && mods_setting_count() > 0) {
+        section(t, "Mod settings");
+        const char *last = NULL;
+        for (int i = 0; i < mods_setting_count(); i++) {
+          const char *id = mods_setting_mod_id(i);
+          if (!last || strcmp(last, id)) { paragraph(gui_str("%s", id), TAG, t->soft, 8, 4); last = id; }
+          bool is_bool = mods_setting_kind(i) == MOD_SETTING_BOOL;
+          bool on = is_bool && mods_setting_value(i);
+          if (tap_row(t, (Row){.id = CLAY_IDI("ModSetting", i), .label = gui_str("%s", mods_setting_name(i)),
+              .value = is_bool ? (on ? CLAY_STRING("On") : CLAY_STRING("Off")) : gui_str("%d", mods_setting_number(i)),
+              .enabled = true, .selected = selected == 2 + i, .toggle = is_bool ? (on ? 1 : 2) : 0}))
+            tapped = GUI_MOD_SETTING + i;
+        }
+        paragraph(CLAY_STRING("Takes effect right away."), SMALL, t->soft, 8, 0);
+      }
       section(t, "Official mods");
       for (int i = 0; i < 2; i++) {
         const ModInfo *info = &official[i];

@@ -255,8 +255,11 @@ if(IOS)
   endif()
   file(GLOB ORACLES_IOS_ICONS ${CMAKE_SOURCE_DIR}/ios/icons/AppIcon*.png)
   set_source_files_properties(${ORACLES_IOS_ICONS} PROPERTIES MACOSX_PACKAGE_LOCATION "")
+  # folder mods that come with the app; copied into Documents/mods on first launch
+  set(ORACLES_IOS_MODS ${CMAKE_SOURCE_DIR}/mods/cheats/mod.ini ${CMAKE_SOURCE_DIR}/mods/cheats/main.lua)
+  set_source_files_properties(${ORACLES_IOS_MODS} PROPERTIES MACOSX_PACKAGE_LOCATION "mods/cheats")
   add_executable(oracles-ios MACOSX_BUNDLE src/platform/app.c src/platform/window.c src/platform/sync_client.c
-    src/platform/haptic.c src/platform/ios_glue.m ${ORACLES_IOS_ICONS})
+    src/platform/haptic.c src/platform/ios_glue.m ${ORACLES_IOS_ICONS} ${ORACLES_IOS_MODS})
   target_link_libraries(oracles-ios oraclesnative oraclesgui oraclessync oracleswide oraclesmods ${ORACLES_SDL_TARGET}
     "-framework UIKit" "-framework Foundation" "-framework UniformTypeIdentifiers")
   target_compile_definitions(oracles-ios PRIVATE ${ORACLES_APP_DEFS})

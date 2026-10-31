@@ -509,6 +509,30 @@ static bool copy_tree(const char *from, const char *to) {
   return SDL_CreateDirectory(to) && SDL_EnumerateDirectory(from, copy_entry, (void *)to);
 }
 
+#ifdef ORACLES_IOS
+// Folder mods shipped inside the app (mods/<id>/ in the bundle) are copied into the data folder's
+// mods/ the first time, since copying a folder in through the Files app is a chore on a phone.
+// Only when missing: deleting one there and keeping it gone is not possible, but a toggled-off mod
+// does nothing, and an edited copy is never overwritten.
+static SDL_EnumerationResult SDLCALL install_bundled_mod(void *cache, const char *dir, const char *name) {
+  char src[1100], dst[1100];
+  snprintf(src, sizeof src, "%s%s", dir, name);
+  snprintf(dst, sizeof dst, "%smods/%s", (const char *)cache, name);
+  if (!file_exists(dst)) copy_tree(src, dst);
+  return SDL_ENUM_CONTINUE;
+}
+static void install_bundled_mods(const char *cache) {
+  const char *base = SDL_GetBasePath();
+  if (!base) return;
+  char src[1100], mods_dir[1100];
+  snprintf(src, sizeof src, "%smods/", base);
+  if (!file_exists(src)) return;
+  snprintf(mods_dir, sizeof mods_dir, "%smods", cache);
+  SDL_CreateDirectory(mods_dir);
+  SDL_EnumerateDirectory(src, install_bundled_mod, (void *)cache);
+}
+#endif
+
 // The data folder for this run, with pref the user's app-data folder. On the first run after Portable
 // is switched on or off, the folder it switches to gets a copy of the other one, unless it already
 // holds something: nothing is ever overwritten, and the old folder stays as it was.
@@ -1432,11 +1456,20 @@ static bool run_mods(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, const
       UiButton b;
       if (!menu_button(&ev, &b)) continue;
       if (b == UI_BACK) { done = true; break; }
-      if (b == UI_UP || b == UI_DOWN) mods_ui.selected = 1 - mods_ui.selected;
+      // rows: the two official mods, then (while playing) each loaded mod's settings
+      int rows = 2 + (mods_ui.playing ? mods_setting_count() : 0);
+      if (b == UI_UP) mods_ui.selected = (mods_ui.selected + rows - 1) % rows;
+      if (b == UI_DOWN) mods_ui.selected = (mods_ui.selected + 1) % rows;
       if (b == UI_ACCEPT || b == UI_LEFT || b == UI_RIGHT) {
-        if (mods_ui.selected == 0) settings.essence_tracker = !settings.essence_tracker;
-        else settings.d1_randomizer = !settings.d1_randomizer;
-        settings_store();
+        if (mods_ui.selected >= 2) {
+          int i = mods_ui.selected - 2;
+          if (mods_setting_kind(i) == MOD_SETTING_BOOL) mods_setting_toggle(i);
+          else mods_setting_step(i, b == UI_LEFT ? -1 : 1);
+        } else {
+          if (mods_ui.selected == 0) settings.essence_tracker = !settings.essence_tracker;
+          else settings.d1_randomizer = !settings.d1_randomizer;
+          settings_store();
+        }
       }
     }
     if (done || quit) break;
@@ -1444,6 +1477,7 @@ static bool run_mods(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, const
     present(ren, tex, game_rgb ? game_rgb : black);
     if (mods_ui.tap == GUI_BACK) push_button(UI_BACK);
     else if (mods_ui.tap >= 0 && mods_ui.tap < 2) { mods_ui.selected = mods_ui.tap; push_button(UI_ACCEPT); }
+    else if (mods_ui.tap >= GUI_MOD_SETTING) { mods_ui.selected = 2 + mods_ui.tap - GUI_MOD_SETTING; push_button(UI_ACCEPT); }
     oracles_frame_wait();
   }
   ui_leave(was);
@@ -2395,6 +2429,9 @@ int main(int argc, char **argv) {
 #endif
   else { char *p = SDL_GetPrefPath("oracles-decomp", "oracles"); if (!p) { fprintf(stderr, "%s\n", SDL_GetError()); return 2; } data_folder(cache, sizeof cache, p); SDL_free(p); }
   SDL_CreateDirectory(cache);
+#ifdef ORACLES_IOS
+  install_bundled_mods(cache);
+#endif
 
   SDL_Window *win;
   SDL_Renderer *ren;

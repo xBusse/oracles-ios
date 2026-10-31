@@ -22,6 +22,8 @@ typedef struct {
 
 #define GUI_NONE (-1)
 #define GUI_BACK (-2)
+// gui_mods returns this plus a mod setting's index when its row is tapped
+#define GUI_MOD_SETTING 100
 #define GUI_UPDATE (-3)
 
 // The pause menu over the dimmed game, inside the game picture. Returns the PauseItem tapped.

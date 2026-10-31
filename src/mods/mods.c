@@ -563,6 +563,14 @@ int mods_setting_max(int i) { return i >= 0 && i < setting_count ? settings[i].i
 void mods_setting_toggle(int i) {
   if (i >= 0 && i < setting_count && settings[i].kind == MOD_SETTING_BOOL) settings[i].bvalue = !settings[i].bvalue;
 }
+void mods_setting_step(int i, int delta) {
+  if (i < 0 || i >= setting_count || settings[i].kind != MOD_SETTING_NUMBER) return;
+  ModSetting *s = &settings[i];
+  int v = s->ivalue + delta;
+  if (v > s->imax) v = s->imin;
+  else if (v < s->imin) v = s->imax;
+  s->ivalue = v;
+}
 
 // Escapes `name` (exactly `name_len` bytes -- a Lua string may legally contain an embedded NUL,
 // so this is never assumed NUL-terminated going in) into `dst`, REFUSING rather than truncating

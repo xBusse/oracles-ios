@@ -293,6 +293,9 @@ int mods_setting_max(int i);
 // Flips a BOOL row's value. A no-op for a NUMBER row, or for `i` out of range -- not a crash and
 // not a silent reinterpretation of imin/imax/ivalue as if they were a bool.
 void mods_setting_toggle(int i);
+// Moves a NUMBER row's value by `delta`, wrapping past either end so one button (or a tap) can
+// reach every value. A no-op for a BOOL row or `i` out of range.
+void mods_setting_step(int i, int delta);
 
 // Called from api.c's oracles.setting(name, true/false): registers (or, for a second call from
 // the same mod with the same name, simply finds) a BOOL row, scoped by (the currently active
