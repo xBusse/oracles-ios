@@ -2,8 +2,12 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "platform/mobile.h"
 
-#ifdef __ANDROID__
+#if defined(ORACLES_IOS)
+#include "platform/ios_glue.h"
+void haptic_tick(void) { ios_haptic_tick(); }
+#elif defined(__ANDROID__)
 #include <jni.h>
 
 // OraclesActivity.haptic(): performHapticFeedback(KEYBOARD_TAP) on the game's view.
