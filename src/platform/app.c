@@ -39,13 +39,19 @@
 #include "sync/http.h"
 #include "sync/update.h"
 
-#ifdef __ANDROID__
+#include "platform/mobile.h"
+#ifdef ORACLES_IOS
+#include "platform/ios_glue.h"
+#endif
+#ifdef ORACLES_MOBILE
 #define ON_PHONE true           // the settings show Vibration and leave out Fullscreen
 #else
 #define ON_PHONE false
 #endif
 // what the update notice downloads: this system's file in the release
-#if defined(__ANDROID__)
+#if defined(ORACLES_IOS)
+#define RELEASE_ASSET ""        // a sideloaded build has nothing to update itself from
+#elif defined(__ANDROID__)
 #define RELEASE_ASSET "Oracles-android.apk"
 #elif defined(_WIN32)
 #define RELEASE_ASSET "Oracles-windows-x64.zip"
@@ -291,7 +297,10 @@ static void show_status(const char *msg);
 static bool pick_rom(char *game_out, const char *cache) {
   static const SDL_DialogFileFilter filters[] = {{"ROM or archive", "gbc;gb;zip;gz;7z"}};
   pick_state = 0;
-#ifdef __ANDROID__
+#if defined(ORACLES_IOS)
+  (void)filters;
+  ios_show_open_file_dialog(on_pick, NULL);
+#elif defined(__ANDROID__)
   (void)filters;
   SDL_ShowOpenFileDialog(on_pick, NULL, NULL, NULL, 0, NULL, false);
 #else
@@ -437,7 +446,7 @@ static void settings_store(void) {
 // Portable mode: portable.txt beside the app (beside Oracles.app on a Mac, whose bundle must stay
 // unmodified) keeps the data in oracles-data/ there instead of the user's app-data folder.
 static bool portable_dir(char *out, size_t size) {
-#ifdef __ANDROID__
+#ifdef ORACLES_MOBILE
   (void)out; (void)size;
   return false;
 #else
@@ -540,7 +549,7 @@ static void data_folder(char *cache, size_t size, const char *pref) {
 }
 
 static void apply_window_settings(SDL_Window *win) {
-#ifdef __ANDROID__
+#ifdef ORACLES_MOBILE
   settings.fullscreen = true;
 #endif
   if (!!(SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN) != settings.fullscreen) SDL_SetWindowFullscreen(win, settings.fullscreen);
@@ -548,7 +557,7 @@ static void apply_window_settings(SDL_Window *win) {
 
 // Turning widescreen on or off reshapes a desktop window to the new picture at its current scale.
 static void fit_window_to_picture(SDL_Window *win) {
-#ifndef __ANDROID__
+#ifndef ORACLES_MOBILE
   if (SDL_GetWindowFlags(win) & SDL_WINDOW_FULLSCREEN) return;
   int w, h;
   if (!SDL_GetWindowSize(win, &w, &h)) return;
@@ -1256,7 +1265,7 @@ static const char *update_test(void) { return getenv("ORACLES_TEST_RELEASE"); }
 
 // Running as an AppImage (the file itself, which the download replaces), else NULL.
 static const char *update_appimage(void) {
-#if !defined(_WIN32) && !defined(__ANDROID__)
+#if !defined(_WIN32) && !defined(ORACLES_MOBILE)
   return getenv("APPIMAGE");
 #else
   return NULL;
@@ -1274,6 +1283,7 @@ static int SDLCALL update_thread(void *data) {
 }
 
 static void update_start(void) {
+  if (!RELEASE_ASSET[0]) return;
   if (ORACLES_VERSION[0] || update_test()) SDL_DetachThread(SDL_CreateThread(update_thread, "update", NULL));
 }
 
@@ -2368,6 +2378,8 @@ int main(int argc, char **argv) {
 #ifdef __ANDROID__
   stderr_to_logcat();
   SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+#endif
+#ifdef ORACLES_MOBILE
   SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait");
   touch_on = true;
 #endif
@@ -2377,6 +2389,10 @@ int main(int argc, char **argv) {
   SDL_AddEventWatch(on_app_event, NULL);
   char cache[1024];
   if (cache_arg) snprintf(cache, sizeof cache, "%s%s", cache_arg, cache_arg[strlen(cache_arg) - 1] == '/' ? "" : "/");
+#ifdef ORACLES_IOS
+  // Documents, so the Files app shows the saves, states and mods folder
+  else if (!ios_documents_dir(cache, sizeof cache)) { fprintf(stderr, "no Documents folder\n"); return 2; }
+#endif
   else { char *p = SDL_GetPrefPath("oracles-decomp", "oracles"); if (!p) { fprintf(stderr, "%s\n", SDL_GetError()); return 2; } data_folder(cache, sizeof cache, p); SDL_free(p); }
   SDL_CreateDirectory(cache);
 

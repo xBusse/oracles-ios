@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 project(oracles C CXX)
+if(IOS)
+  # The UIKit glue (ROM picker, haptics, NSURLSession sync) is Objective-C.
+  enable_language(OBJC)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -16,7 +20,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 
-if(ANDROID)
+if(ANDROID OR IOS)
   option(ORACLES_SDL "Build the SDL3 frontend" OFF)
 else()
   option(ORACLES_SDL "Build the SDL3 frontend" ON)
@@ -74,6 +78,7 @@ target_include_directories(oraclescore PUBLIC src)
 add_library(oraclesnative STATIC ${ORACLES_SHARED_SRC} src/rt/native.c)
 target_include_directories(oraclesnative PUBLIC src)
 
+if(NOT IOS)   # command-line tools have no place in an iOS app bundle
 add_executable(oracles-run src/platform/headless.c)
 target_link_libraries(oracles-run oraclescore)
 add_executable(oracles-native-run src/platform/headless.c)
@@ -82,6 +87,7 @@ target_compile_definitions(oracles-native-run PRIVATE ORACLES_NATIVE=1)
 add_custom_target(oracles-ref DEPENDS oracles-run)
 add_executable(lockstep-native tools/lockstep_native.c tools/lockstep_native_engine.c)
 target_link_libraries(lockstep-native oraclescore)
+endif()
 
 if(ORACLES_SDL)
   if(NOT ORACLES_SDL_VENDORED)
@@ -146,6 +152,10 @@ if(WIN32)
   target_link_libraries(oraclessync PUBLIC winhttp)
 elseif(ANDROID)
   target_sources(oraclessync PRIVATE src/sync/http_android.c)
+elseif(IOS)
+  # iOS has no libcurl to dlopen: NSURLSession, with the system's TLS
+  target_sources(oraclessync PRIVATE src/sync/http_apple.m)
+  target_link_libraries(oraclessync PUBLIC "-framework Foundation")
 else()
   target_sources(oraclessync PRIVATE src/sync/http_curl.c)
   target_link_libraries(oraclessync PUBLIC ${CMAKE_DL_LIBS})
@@ -157,7 +167,7 @@ endif()
 # The menus at screen resolution (src/gui): Clay lays them out, SDL draws them, in VT323 (OFL),
 # which is embedded in the binary. Only the app links it; the engine libraries and headless
 # runners never see SDL or the font.
-if(ORACLES_SDL OR ANDROID)
+if(ORACLES_SDL OR ANDROID OR IOS)
   set(ORACLES_FONT ${CMAKE_SOURCE_DIR}/third_party/fonts/VT323-Regular.ttf)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/gui_vt323.c
     COMMAND ${CMAKE_COMMAND} -DIN=${ORACLES_FONT} -DOUT=${CMAKE_BINARY_DIR}/gui_vt323.c -DNAME=gui_vt323 -P ${CMAKE_SOURCE_DIR}/cmake/embed.cmake
@@ -211,6 +221,10 @@ target_link_libraries(oraclesmods PUBLIC oraclesui oraclesitem)
 if(NOT WIN32)
   target_compile_definitions(oraclesmods PRIVATE LUA_USE_POSIX)
 endif()
+if(IOS)
+  # the iOS SDK marks system() unavailable; Lua's own switch makes os.execute report failure instead
+  target_compile_definitions(oraclesmods PRIVATE LUA_USE_IOS)
+endif()
 
 # The Android app: SDL3 from source, linked statically into libmain.so with the engine and the UI.
 if(ANDROID)
@@ -222,6 +236,46 @@ if(ANDROID)
   target_link_libraries(main oraclesnative oraclesgui oraclessync oracleswide oraclesmods ${ORACLES_SDL_TARGET} log)
   target_compile_definitions(main PRIVATE ${ORACLES_APP_DEFS})
   set_target_properties(main PROPERTIES LINKER_LANGUAGE CXX)
+  return()
+endif()
+
+# The iOS app: SDL3 from source, linked statically into one app bundle with the engine and the UI,
+# the same pieces as the Android libmain. Generate an Xcode project with ios/build.sh.
+if(IOS)
+  oracles_fetch_sdl()
+  target_link_libraries(oraclessync PUBLIC ${ORACLES_SDL_TARGET})
+  target_link_libraries(oraclesgui PUBLIC ${ORACLES_SDL_TARGET})
+  set(ORACLES_IOS_BUNDLE_ID "dev.oracles-decomp.oracles" CACHE STRING "iOS bundle identifier")
+  if(ORACLES_VERSION_NUMBER)
+    set(ORACLES_BUNDLE_VERSION "${ORACLES_VERSION_NUMBER}")
+  else()
+    file(READ ${CMAKE_SOURCE_DIR}/VERSION ORACLES_BUNDLE_VERSION)
+    string(STRIP "${ORACLES_BUNDLE_VERSION}" ORACLES_BUNDLE_VERSION)
+    string(REGEX REPLACE "^v" "" ORACLES_BUNDLE_VERSION "${ORACLES_BUNDLE_VERSION}")
+  endif()
+  file(GLOB ORACLES_IOS_ICONS ${CMAKE_SOURCE_DIR}/ios/icons/AppIcon*.png)
+  set_source_files_properties(${ORACLES_IOS_ICONS} PROPERTIES MACOSX_PACKAGE_LOCATION "")
+  add_executable(oracles-ios MACOSX_BUNDLE src/platform/app.c src/platform/window.c src/platform/sync_client.c
+    src/platform/haptic.c src/platform/ios_glue.m ${ORACLES_IOS_ICONS})
+  target_link_libraries(oracles-ios oraclesnative oraclesgui oraclessync oracleswide oraclesmods ${ORACLES_SDL_TARGET}
+    "-framework UIKit" "-framework Foundation" "-framework UniformTypeIdentifiers")
+  target_compile_definitions(oracles-ios PRIVATE ${ORACLES_APP_DEFS})
+  set_source_files_properties(src/platform/ios_glue.m src/sync/http_apple.m PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(oracles-ios PROPERTIES
+    LINKER_LANGUAGE CXX
+    OUTPUT_NAME "Oracles"
+    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/ios/Info.plist.in
+    MACOSX_BUNDLE_EXECUTABLE_NAME "Oracles"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "${ORACLES_IOS_BUNDLE_ID}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${ORACLES_BUNDLE_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${ORACLES_BUNDLE_VERSION}"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${ORACLES_IOS_BUNDLE_ID}"
+    XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
+    XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC "YES"
+    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL[variant=Release] "3"
+    XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING "YES")
   return()
 endif()
 
