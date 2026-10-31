@@ -1,0 +1,25 @@
+name: ios
+# Builds the unsigned Oracles.ipa (for SideStore / AltStore to sign) on a Mac runner, so an IPA
+# can be had without a Mac at hand. Download it from the run's Artifacts.
+on:
+  push:
+    branches: [ios-port]
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build IPA
+        run: ios/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Oracles-ipa
+          path: Oracles.ipa
+          retention-days: 14
