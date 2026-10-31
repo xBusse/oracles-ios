@@ -79,7 +79,6 @@ void settings_menu_open(SettingsMenu *m, bool phone) {
 }
 
 bool settings_row_shown(const SettingsMenu *m, SettingsRow r) {
-  if (r == SET_MODS) return false; // Deferred until the mods release.
   if (r == SET_HAPTICS) return m->phone;
   if (r == SET_FULLSCREEN || r == SET_PORTABLE) return !m->phone;
   return true;

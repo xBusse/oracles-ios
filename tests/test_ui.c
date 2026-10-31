@@ -218,7 +218,9 @@ static void settings_menu_changes_values(void) {
   settings_press(&m, &s, UI_UP, &row);
   settings_press(&m, &s, UI_UP, &row);
   settings_press(&m, &s, UI_UP, &row);
-  ASSERT(!settings_row_shown(&m, SET_MODS));
+  ASSERT(settings_row_shown(&m, SET_MODS));
+  ASSERT_EQ(m.sel, SET_MODS);                           // Mods is the last row; wrapping lands there
+  settings_press(&m, &s, UI_UP, &row);
   ASSERT_EQ(m.sel, SET_ERROR_LOG);                      // unavailable until a report exists
   ASSERT_EQ(settings_press(&m, &s, UI_ACCEPT, &row), MENU_NONE);
   s.error_log = true;
