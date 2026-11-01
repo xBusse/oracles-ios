@@ -432,6 +432,10 @@ foreach(t sha1 bus cpu blargg ppu acid2 tas smoke archive)
   endif()
 endforeach()
 
+add_executable(test_features tests/test_features.c)
+target_link_libraries(test_features oraclesnative)
+add_test(NAME features COMMAND test_features)
+
 add_executable(test_slot_hud tests/test_slot_hud.c)
 target_link_libraries(test_slot_hud oraclesnative)
 target_compile_definitions(test_slot_hud PRIVATE GAME_ROM_DIR="${GAME_ROM_DIR}")

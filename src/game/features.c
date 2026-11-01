@@ -3,6 +3,16 @@
 
 Features features;
 
+#define SPEED_STEP 5          // SPEED_20: the speed table has a row every 0x20 subpixels a frame
+#define SPEED_TOP 0x78        // SPEED_300, the fastest any object in the game moves
+
+uint8_t features_link_speed(uint8_t speed) {
+  int q = features.walk_speed;
+  if (q <= 4 || speed == 0 || speed > SPEED_TOP) return speed;
+  int scaled = (speed * q + 2 * SPEED_STEP) / (4 * SPEED_STEP) * SPEED_STEP;   // nearest step
+  return (uint8_t)(scaled > SPEED_TOP ? SPEED_TOP : scaled);
+}
+
 // the moments the player could open the inventory and change the buttons there
 static bool can_change_items(GB *gb) {
   return !W8(wMenuDisabled) && !W8(wOpenedMenuType) && !W8(wTextIsActive) && !W8(wDisableLinkCollisionsAndMenu);

@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert (game / "sram.sav").read_bytes() == b"existing save"
     assert (game / "state_auto").read_bytes() == b"existing resume state"
     # A fresh process can copy the same report, including the inactive EU folder.
-    r = run(cache, script="10:Right,20:Down,30:Up,40:^Setting.18,50:Z,60:Z")
+    r = run(cache, script="10:Right,20:Down,30:Up,40:^Setting.20,50:Z,60:Z")
     assert r.returncode == 0, r.stderr
     assert "test tap: no" not in r.stderr, r.stderr
     assert report in r.stdout, r.stdout

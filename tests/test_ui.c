@@ -181,6 +181,16 @@ static void settings_round_trip(void) {
   ASSERT_EQ(back.filter, FILTER_CRT);
   ASSERT_EQ(back.ff_speed, FF_SPEED_MAX);
   ASSERT(back.gbc_colours && back.fullscreen && back.fill && back.widescreen && !back.dim_sides && !back.haptics);
+  {
+    Settings t; settings_default(&t);
+    t.ff_toggle = true; t.walk_speed = 7;
+    char ini[2048]; settings_format(&t, ini, sizeof ini);
+    Settings u; settings_default(&u); settings_parse(&u, ini);
+    ASSERT(u.ff_toggle);
+    ASSERT_EQ(u.walk_speed, 7);
+    settings_default(&u); settings_parse(&u, "walk_speed=9\nwalk_speed=1\n");
+    ASSERT_EQ(u.walk_speed, WALK_SPEED_MIN);              // out of range is ignored
+  }
   settings_parse(&back, "volume=99\nfilter=weird\nunknown=1\n  volume = 7\nfast_forward=9\nfast_forward=1\n");
   ASSERT_EQ(back.volume, 7);                            // 99 rejected, spaced line accepted
   ASSERT_EQ(back.filter, FILTER_CRT);
@@ -252,6 +262,25 @@ static void settings_menu_changes_values(void) {
   settings_press(&m, &s, UI_ACCEPT, &row);
   ASSERT(s.quick_swap);
   settings_press(&m, &s, UI_UP, &row);
+  ASSERT_EQ(m.sel, SET_WALK_SPEED);
+  ASSERT_EQ(s.walk_speed, WALK_SPEED_MIN);                // off unless chosen
+  settings_press(&m, &s, UI_RIGHT, &row);
+  settings_press(&m, &s, UI_RIGHT, &row);
+  ASSERT_EQ(s.walk_speed, 6);                             // 1.5x
+  settings_press(&m, &s, UI_LEFT, &row);
+  settings_press(&m, &s, UI_LEFT, &row);
+  settings_press(&m, &s, UI_LEFT, &row);
+  ASSERT_EQ(s.walk_speed, WALK_SPEED_MAX);                // wraps like the other steppers
+  settings_press(&m, &s, UI_RIGHT, &row);
+  ASSERT_EQ(s.walk_speed, WALK_SPEED_MIN);
+  settings_press(&m, &s, UI_UP, &row);
+  ASSERT_EQ(m.sel, SET_FF_TOGGLE);
+  ASSERT(!s.ff_toggle);
+  settings_press(&m, &s, UI_ACCEPT, &row);
+  ASSERT(s.ff_toggle);
+  settings_press(&m, &s, UI_ACCEPT, &row);
+  ASSERT(!s.ff_toggle);
+  settings_press(&m, &s, UI_UP, &row);
   ASSERT_EQ(m.sel, SET_FF_SPEED);
   settings_press(&m, &s, UI_ACCEPT, &row);
   ASSERT_EQ(s.ff_speed, 4);
@@ -268,6 +297,8 @@ static void settings_menu_changes_values(void) {
   settings_press(&m, &s, UI_UP, &row);
   settings_press(&m, &s, UI_ACCEPT, &row);
   ASSERT(s.fast_text);
+  settings_press(&m, &s, UI_DOWN, &row);
+  settings_press(&m, &s, UI_DOWN, &row);
   settings_press(&m, &s, UI_DOWN, &row);
   settings_press(&m, &s, UI_DOWN, &row);
   settings_press(&m, &s, UI_DOWN, &row);

@@ -17,6 +17,8 @@ void settings_default(Settings *s) {
   s->quick_swap = false;
   s->fast_menus = false;
   s->ff_speed = 3;
+  s->ff_toggle = false;
+  s->walk_speed = WALK_SPEED_MIN;
   s->four_slots = false;
   s->haptics = true;
   s->essence_tracker = false;
@@ -46,6 +48,8 @@ void settings_parse(Settings *s, const char *text) {
       else if (!strcmp(key, "quick_swap")) s->quick_swap = !strcmp(value, "on");
       else if (!strcmp(key, "fast_menus")) s->fast_menus = !strcmp(value, "on");
       else if (!strcmp(key, "fast_forward")) { int v = atoi(value); if (v >= FF_SPEED_MIN && v <= FF_SPEED_MAX) s->ff_speed = v; }
+      else if (!strcmp(key, "fast_forward_toggle")) s->ff_toggle = !strcmp(value, "on");
+      else if (!strcmp(key, "walk_speed")) { int v = atoi(value); if (v >= WALK_SPEED_MIN && v <= WALK_SPEED_MAX) s->walk_speed = v; }
       else if (!strcmp(key, "four_slots")) s->four_slots = !strcmp(value, "on");
       else if (!strcmp(key, "d1_randomizer")) s->d1_randomizer = !strcmp(value, "on");
       else if (!strcmp(key, "essence_tracker")) s->essence_tracker = !strcmp(value, "on");
@@ -67,6 +71,7 @@ int settings_format(const Settings *s, char *out, size_t size) {
                    s->volume, s->fullscreen ? "on" : "off", filter_keys[s->filter], s->fill ? "fill" : "pixel", s->widescreen ? "on" : "off", s->dim_sides ? "on" : "off", s->gbc_colours ? "on" : "off",
                    s->fast_text ? "on" : "off", s->fast_menus ? "on" : "off", s->ff_speed, s->quick_swap ? "on" : "off", s->four_slots ? "on" : "off",
                    s->haptics ? "on" : "off", pad_style_keys[s->pad_style < STYLES ? s->pad_style : STYLE_AUTO]);
+  if (n < (int)size) n += snprintf(out + n, size - n, "fast_forward_toggle=%s\nwalk_speed=%d\n", s->ff_toggle ? "on" : "off", s->walk_speed);
   if (n < (int)size) n += snprintf(out + n, size - n, "d1_randomizer=%s\n", s->d1_randomizer ? "on" : "off");
   if (n < (int)size) n += snprintf(out + n, size - n, "essence_tracker=%s\n", s->essence_tracker ? "on" : "off");
   if (n < (int)size) n += bindings_format(&s->bindings, out + n, size - n);
@@ -112,6 +117,8 @@ MenuAction settings_press(SettingsMenu *m, Settings *s, UiButton b, SettingsRow 
   case SET_FAST_TEXT: if (dir) s->fast_text = !s->fast_text; break;
   case SET_FAST_MENUS: if (dir) s->fast_menus = !s->fast_menus; break;
   case SET_FF_SPEED: s->ff_speed = FF_SPEED_MIN + (s->ff_speed - FF_SPEED_MIN + dir + FF_SPEEDS) % FF_SPEEDS; break;
+  case SET_FF_TOGGLE: if (dir) s->ff_toggle = !s->ff_toggle; break;
+  case SET_WALK_SPEED: s->walk_speed = WALK_SPEED_MIN + (s->walk_speed - WALK_SPEED_MIN + dir + (WALK_SPEED_MAX - WALK_SPEED_MIN + 1)) % (WALK_SPEED_MAX - WALK_SPEED_MIN + 1); break;
   case SET_QUICK_SWAP: if (dir) s->quick_swap = !s->quick_swap; break;
   case SET_FOUR_SLOTS: if (dir) s->four_slots = !s->four_slots; break;
   case SET_HAPTICS: if (dir) s->haptics = !s->haptics; break;

@@ -641,6 +641,7 @@ static void apply_game_settings(void) {
   features.quick_swap = settings.quick_swap;
   features.fast_menus = settings.fast_menus;
   features.four_slots = settings.four_slots;
+  features.walk_speed = (uint8_t)settings.walk_speed;
 }
 
 // The items on X and Y, per game: two bytes in item_buttons.
@@ -678,6 +679,7 @@ static void item_button(GB *gb, const char *dir, int slot, bool down) {
 static TouchLayout layout;
 static bool touch_mouse;
 static uint32_t touch_held, touch_pressed, touch_released;
+static bool ff_latched;          // the fast-forward toggle is on, so the pad shows >> held
 static struct { SDL_FingerID id; uint32_t held; bool down; } fingers[FINGERS];
 static UiTheme overlay_theme;            // the game's title-screen colours, behind widescreen's sides
 static UiFont mod_font;                  // the ROM's dialogue font, for mods' overlay text
@@ -883,7 +885,7 @@ static void present_frame(SDL_Renderer *ren, const uint8_t *rgb, int pic_w) {
     draw_pic(ren, &strip[1], src[1], sw_px, scale, fractional, f, &right);
     strips_shown = true;
   }
-  if (touch_on && !overlay_blocked) gui_pad(&layout, touch_held, &gui_t);
+  if (touch_on && !overlay_blocked) gui_pad(&layout, touch_held | (ff_latched ? 1u << ACT_FAST : 0), &gui_t);
   bool toast_on = toast[0] && SDL_GetTicks() < toast_until;
   if (ui_layer || toast_on || waiting) {
     GuiFrame f = {{(float)layout.game_px.x, (float)layout.game_px.y, (float)layout.game_px.w, (float)layout.game_px.h},
@@ -2108,6 +2110,7 @@ static GameEnd run_game(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, co
   uint64_t frames = 0, save_from = NO_SAVE, park_from = 0, ff_due = 0;
   int ff_ratio = 1;                       // the audio stream's frequency ratio: settings.ff_speed while fast-forwarding
   bool muted = false, parked = false, fast = false;
+  ff_latched = false;
   GameMode mode = MODE_PLAY;
   GameEnd end = GAME_QUIT;
   BootDriver boot = {gs->start_file >= 0 ? BOOT_TO_FILE_SELECT : BOOT_OFF, gs->start_file, gs->open_file, 0};
@@ -2221,7 +2224,7 @@ static GameEnd run_game(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, co
       for (int a = 0; a < ACTIONS; a++) {
         bool item = a == ACT_ITEM_X || a == ACT_ITEM_Y;
         if (press >> a & 1) {
-          if (a == ACT_FAST) fast = true;
+          if (a == ACT_FAST) fast = settings.ff_toggle ? !fast : true;
           else if (a == ACT_SWAP) features_quick_swap(gb);
           else if (a == ACT_SAVE_STATE) save_from = frames;
           else if (a == ACT_LOAD_STATE) {
@@ -2233,7 +2236,7 @@ static GameEnd run_game(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, co
           else live_joy = tap_press(&taps, live_joy, joy_of((Action)a));
         }
         if (release >> a & 1) {
-          if (a == ACT_FAST) fast = false;
+          if (a == ACT_FAST) { if (!settings.ff_toggle) fast = false; }
           else if (item) item_button(gb, dir, a == ACT_ITEM_Y, false);
           else live_joy = tap_release(&taps, live_joy, joy_of((Action)a));
         }
@@ -2269,6 +2272,7 @@ static GameEnd run_game(SDL_Window *win, SDL_Renderer *ren, SDL_Texture *tex, co
 
     // fast-forward's sound plays ff_speed times as fast; what it left queued is dropped on release,
     // as at normal speed it would play slowed down and late
+    ff_latched = settings.ff_toggle && fast;
     int ratio = fast && mode == MODE_PLAY && (boot.phase == BOOT_OFF || boot.phase == BOOT_LANGUAGE) ? settings.ff_speed : 1;
     if (ratio != ff_ratio) {
       if (audio && ratio == 1) SDL_ClearAudioStream(audio);
