@@ -4867,7 +4867,7 @@ select_speed:
   CYC(b_+69, b_+72); SET_HL(linkSpeedTable_bank05);
   CYC(b_+72, b_+73); link_add_a_to_hl(gb, b_+73);
   CYC(b_+73, b_+74); A = mem_rd(gb, HL);
-  A = features_link_speed(A);   // the walk speed setting; unchanged when it is off
+  A = features_link_speed(gb, A);   // the walk speed setting; unchanged when it is off
   CYC(b_+74, b_+75); H = D;
   CYC(b_+75, b_+77); L = 0x11;
   CYC(b_+77, b_+78); mem_wr(gb, HL, A); SET_HL(HL - 1);

@@ -33,9 +33,12 @@ uint8_t features_slot_press(struct GB *gb, int slot);
 void features_slot_release(struct GB *gb, int slot);
 // The item shown on A/B, hiding an extra slot's temporary assignment when it has its own box.
 uint8_t features_hud_item(struct GB *gb, uint16_t addr);
-// Scales a speed the game picked for Link's own movement by walk_speed, onto a speed the game's
-// speed table has (a multiple of 5, at most SPEED_300). Everything else moves at its own speed.
-uint8_t features_link_speed(uint8_t speed);
+// `speed` scaled by q quarters (4 = unchanged) onto a speed the game's speed table has: a multiple
+// of 5, at most SPEED_300.
+uint8_t features_scale_speed(int q, uint8_t speed);
+// The speed the game picked for Link, scaled by walk_speed only while the player is steering him
+// (see features.c). Everything else moves at its own speed.
+uint8_t features_link_speed(struct GB *gb, uint8_t speed);
 // The 4 treasureObjectData bytes of (id, subid), read from the ROM.
 void features_treasure_object(struct GB *gb, uint8_t id, uint8_t subid, uint8_t out[4]);
 // Called by interactionLoadTreasureData with the treasure object: applies treasure_swap, keeping

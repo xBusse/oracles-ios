@@ -6,11 +6,23 @@ Features features;
 #define SPEED_STEP 5          // SPEED_20: the speed table has a row every 0x20 subpixels a frame
 #define SPEED_TOP 0x78        // SPEED_300, the fastest any object in the game moves
 
-uint8_t features_link_speed(uint8_t speed) {
-  int q = features.walk_speed;
+uint8_t features_scale_speed(int q, uint8_t speed) {
   if (q <= 4 || speed == 0 || speed > SPEED_TOP) return speed;
   int scaled = (speed * q + 2 * SPEED_STEP) / (4 * SPEED_STEP) * SPEED_STEP;   // nearest step
   return (uint8_t)(scaled > SPEED_TOP ? SPEED_TOP : scaled);
+}
+
+// Only while the player is steering Link: his normal state, a direction held, nothing frozen for a
+// cutscene. Walking in through a cave or door (warpTransition3), forced movement (state 0b) and
+// scripted walks move him a fixed number of frames, so a faster speed there carries him past where
+// the game means to stop him -- into the middle of the room, or into a wall.
+#define LINK_STATE_NORMAL 0x01
+#define DIRECTION_KEYS 0xf0           // right, left, up, down
+uint8_t features_link_speed(struct GB *gb, uint8_t speed) {
+  if (features.walk_speed <= 4) return speed;
+  if (W8(w1Link_state) != LINK_STATE_NORMAL || !(W8(wGameKeysPressed) & DIRECTION_KEYS) || W8(wDisabledObjects))
+    return speed;
+  return features_scale_speed(features.walk_speed, speed);
 }
 
 // the moments the player could open the inventory and change the buttons there
